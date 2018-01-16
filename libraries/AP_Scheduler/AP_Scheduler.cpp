@@ -63,8 +63,8 @@ AP_Scheduler::AP_Scheduler(void)
     // only allow 50 to 400 Hz
     if (_loop_rate_hz < 50) {
         _loop_rate_hz.set(50);
-    } else if (_loop_rate_hz > 400) {
-        _loop_rate_hz.set(400);
+    } else if (_loop_rate_hz > 1500) {
+        _loop_rate_hz.set(1500);
     }
 }
 
