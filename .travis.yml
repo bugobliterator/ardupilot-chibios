@@ -1,6 +1,10 @@
 language: cpp
-sudo: false
 
+os:
+  - linux
+  - osx
+
+sudo: false
 addons:
   coverity_scan:
     project:
@@ -73,14 +77,10 @@ env:
     #   via the "travis encrypt" command using the project repo's public key
     - secure: "FjIwqZQV2FhNPWYITX5LZXTE38yYqBaQdbm3QmbEg/30wnPTm1ZOLIU7o/aSvX615ImR8kHoryvFPDQDWc6wWfqTEs3Ytq2kIvcIJS2Y5l/0PFfpWJoH5gRd6hDThnoi+1oVMLvj1+bhn4yFlCCQ2vT/jxoGfiQqqgvHtv4fLzI="
 
-matrix:
-  fast_finish: true
-  include:
-    - compiler: "gcc"
-      env: CI_BUILD_TARGET="px4-v2"
-    - compiler: "gcc"
-      env: CI_BUILD_TARGET="px4-v4"
-    - compiler: "gcc"
-      env: CI_BUILD_TARGET="sitltest-copter"
-    - compiler: "gcc"
-      env: CI_BUILD_TARGET="sitltest-quadplane sitltest-rover"
+compiler: "gcc"
+
+env: 
+  - CI_BUILD_TARGET="px4-v2"
+  - CI_BUILD_TARGET="px4-v4"
+  - CI_BUILD_TARGET="sitltest-copter"
+  - CI_BUILD_TARGET="sitltest-quadplane sitltest-rover"
