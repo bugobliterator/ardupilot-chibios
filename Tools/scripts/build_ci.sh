@@ -42,6 +42,7 @@ for board in $($waf list_boards | head -n1); do waf_supported_boards[$board]=1; 
 function get_time {
     date -u "+%s"
 }
+export CCACHE_DISABLE="true"
 
 echo "Targets: $CI_BUILD_TARGET"
 for t in $CI_BUILD_TARGET; do
@@ -49,34 +50,34 @@ for t in $CI_BUILD_TARGET; do
     if [ $t == "sitltest-copter" ]; then
         echo "Installing pymavlink"
         git submodule init
-        git submodule update
-        (cd modules/mavlink/pymavlink && python setup.py build install --user)
+        git submodule update --recursive
+        (cd modules/mavlink/pymavlink && python setup.py build install --user --force)
         unset BUILDROOT
         echo "Running SITL QuadCopter test"
         Tools/autotest/autotest.py build.ArduCopter fly.ArduCopter
-        ccache -s && ccache -z
+        #ccache -s && ccache -z
         continue
     fi
     if [ $t == "sitltest-quadplane" ]; then
         echo "Installing pymavlink"
         git submodule init
-        git submodule update
-        (cd modules/mavlink/pymavlink && python setup.py build install --user)
+        git submodule update --recursive
+        (cd modules/mavlink/pymavlink && python setup.py build install --user --force)
         unset BUILDROOT
         echo "Running SITL QuadPlane test"
         Tools/autotest/autotest.py build.ArduPlane fly.QuadPlane
-        ccache -s && ccache -z
+        #ccache -s && ccache -z
         continue
     fi
     if [ $t == "sitltest-rover" ]; then
         echo "Installing pymavlink"
         git submodule init
-        git submodule update
-        (cd modules/mavlink/pymavlink && python setup.py build install --user)
+        git submodule update --recursive
+        (cd modules/mavlink/pymavlink && python setup.py build install --user --force)
         unset BUILDROOT
         echo "Running SITL Rover test"
         Tools/autotest/autotest.py build.APMrover2 drive.APMrover2
-        ccache -s && ccache -z
+        #ccache -s && ccache -z
         continue
     fi
 

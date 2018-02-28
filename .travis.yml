@@ -3,6 +3,7 @@ language: cpp
 os:
   - linux
   - osx
+osx_image: xcode9.2
 
 sudo: false
 addons:
@@ -45,7 +46,7 @@ cache:
     - $HOME/opt
 
 before_install:
-  - Tools/scripts/configure-ci.sh
+  - if [[ $TRAVIS_OS_NAME == 'osx' ]]; then yes | Tools/scripts/install-prereqs-mac.sh ; else Tools/scripts/configure-ci.sh ; fi
   - if [ "$TRAVIS_EVENT_TYPE" = "cron" ]; then export CI_CRON_JOB=1 ; fi
 
 script:
@@ -54,7 +55,7 @@ script:
   - python Tools/autotest/param_metadata/param_parse.py --no-emit --vehicle ArduCopter
   - python Tools/autotest/param_metadata/param_parse.py --no-emit --vehicle ArduPlane
   - python Tools/autotest/param_metadata/param_parse.py --no-emit --vehicle ArduSub
-  - Tools/scripts/build_ci.sh
+  - bash Tools/scripts/build_ci.sh
 
 before_cache:
   - ccache -z
@@ -77,10 +78,8 @@ env:
     #   via the "travis encrypt" command using the project repo's public key
     - secure: "FjIwqZQV2FhNPWYITX5LZXTE38yYqBaQdbm3QmbEg/30wnPTm1ZOLIU7o/aSvX615ImR8kHoryvFPDQDWc6wWfqTEs3Ytq2kIvcIJS2Y5l/0PFfpWJoH5gRd6hDThnoi+1oVMLvj1+bhn4yFlCCQ2vT/jxoGfiQqqgvHtv4fLzI="
 
-compiler: "gcc"
-
 env: 
-  - CI_BUILD_TARGET="px4-v2"
-  - CI_BUILD_TARGET="px4-v4"
   - CI_BUILD_TARGET="sitltest-copter"
   - CI_BUILD_TARGET="sitltest-quadplane sitltest-rover"
+  - CI_BUILD_TARGET="px4-v2"
+  - CI_BUILD_TARGET="px4-v4"

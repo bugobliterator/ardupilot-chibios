@@ -16,17 +16,22 @@ brew update
 brew install genromfs
 brew install gcc-arm-none-eabi
 brew install gawk
+brew install bash
+brew install python
 
-echo "Checking pip..."
-$(which -s pip)
-if [[ $? != 0 ]] ; then
-    echo "installing pip..."
-    sudo easy_install pip
-else
-    echo "pip installed"
-fi
+python easy_install pip  --user --force
+pip install pyserial future catkin_pkg empy argparse pexpect lxml  --user --force
+sudo pip install mavproxy
+mavproxy.py --version
+brew install gcc
+brew link --overwrite gcc
+sudo bash -c 'echo /usr/local/bin/bash >> /etc/shells'
 
-sudo pip2 install pyserial future catkin_pkg empy
+ln -s /usr/local/bin/gcc-7 /usr/local/bin/gcc
+ln -s /usr/local/bin/g++-7 /usr/local/bin/g++
+ln -s /usr/local/bin/gcc-ranlib-7 /usr/local/bin/ranlib
+ln -s /usr/local/bin/gcc-ar-7 /usr/local/bin/ar
+
 
 SCRIPT_DIR=$(dirname $(realpath ${BASH_SOURCE[0]}))
 ARDUPILOT_ROOT=$(realpath "$SCRIPT_DIR/../../")
@@ -44,5 +49,37 @@ grep -Fxq "$exportline" ~/.profile 2>/dev/null || {
 }
 
 git submodule update --init --recursive
+
+
+
+if [[ $TRAVIS == 'true' ]]; then
+    # ccache
+    dir=$CCACHE_ROOT
+    if [ ! -d "$HOME/opt/$dir" ]; then
+        # if version 3 isn't there, try to remove older v2 folders from CI cache
+        rm -rf "$HOME/opt"/ccache-3.2*
+
+        wget https://www.samba.org/ftp/ccache/$CCACHE_TARBALL
+        tar -xf $CCACHE_TARBALL
+        pushd $CCACHE_ROOT
+        ./configure --prefix="/tmp" --bindir="$HOME/opt/$dir"
+        make
+        make install
+        popd
+    fi
+    mkdir -p $HOME/ccache
+
+    # configure ccache
+    ln -s ~/opt/$CCACHE_ROOT/ccache ~/ccache/g++
+    ln -s ~/opt/$CCACHE_ROOT/ccache ~/ccache/gcc
+    ln -s ~/opt/$CCACHE_ROOT/ccache ~/ccache/arm-none-eabi-g++
+    ln -s ~/opt/$CCACHE_ROOT/ccache ~/ccache/arm-none-eabi-gcc
+    ln -s ~/opt/$CCACHE_ROOT/ccache ~/ccache/arm-linux-gnueabihf-g++
+    ln -s ~/opt/$CCACHE_ROOT/ccache ~/ccache/arm-linux-gnueabihf-gcc
+    ln -s ~/opt/$CCACHE_ROOT/ccache ~/ccache/clang++
+    ln -s ~/opt/$CCACHE_ROOT/ccache ~/ccache/clang
+fi
+
+. ~/.profile
 
 echo "finished"

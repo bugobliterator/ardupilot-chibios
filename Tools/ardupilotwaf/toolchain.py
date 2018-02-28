@@ -17,7 +17,9 @@ from waflib.Configure import conf
 from waflib.Tools import compiler_c, compiler_cxx
 from waflib.Tools import clang, clangxx, gcc, gxx
 from waflib import Logs
+from waflib.Tools.cxx import cxxstlib
 
+import sys
 import os
 import re
 
@@ -129,8 +131,12 @@ def find_toolchain_program(cfg, filename, **kw):
 def configure(cfg):
     _filter_supported_c_compilers('gcc', 'clang')
     _filter_supported_cxx_compilers('g++', 'clang++')
-
     if cfg.env.TOOLCHAIN == 'native':
+        if sys.platform == 'darwin':
+            cfg.find_program('libtool')
+            cxxstlib.run_str = 'libtool -o ${TGT} -static ${SRC}'
+            cfg.env.AR = 'libtool'
+            cfg.env.ARFLAGS = ['-static', '-o']
         cfg.load('compiler_cxx compiler_c')
         if cfg.env.COMPILER_CC == 'clang' or cfg.env.COMPILER_CXX == 'clang++':
             Logs.warn("Warning! Native clang builds can be unstable, please use gcc/g++. \
