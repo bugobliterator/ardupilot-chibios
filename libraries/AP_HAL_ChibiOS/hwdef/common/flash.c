@@ -471,13 +471,20 @@ static bool stm32_flash_write_f4f7(uint32_t addr, const void *buf, uint32_t coun
 {
     uint8_t *b = (uint8_t *)buf;
 
-    /* STM32 requires half-word access */
-    if (count & 1) {
-        return false;
-    }
+    uint32_t written = count;
+    bool otp_write = false;
 
     if ((addr+count) >= STM32_FLASH_BASE+STM32_FLASH_SIZE) {
-        return false;
+        //Check if OTP region
+        if ((addr < ADDR_OTP_START) && ((addr + count) > (ADDR_OTP_LOCK_START + 0x10))) {
+            return false;
+        }
+        otp_write = true;
+    } else {
+        /* STM32 requires half-word access */
+        if (count & 1) {
+            return false;
+        }
     }
 
     /* Get flash ready and begin flashing */
@@ -541,6 +548,18 @@ static bool stm32_flash_write_f4f7(uint32_t addr, const void *buf, uint32_t coun
         count -= 2;
         b += 2;
         addr += 2;
+    }
+
+    if (count == 1 && otp_write) {
+        FLASH->CR &= ~(FLASH_CR_PSIZE);
+		FLASH->CR |= FLASH_CR_PG;
+        *(volatile uint8_t *)addr = *(uint8_t *)b;
+        stm32_flash_wait_idle();
+        if (*(volatile uint8_t *)addr == *(uint8_t *)b) {
+            FLASH->CR &= (~FLASH_CR_PG);
+            goto failed;
+        }
+        count -= 1;
     }
 
     FLASH->CR &= ~(FLASH_CR_PG);

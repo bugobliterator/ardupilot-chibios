@@ -17,6 +17,13 @@
  */
 #include "hal.h"
 
+
+#define ADDR_OTP_START	        0x1FFF7800
+#define ADDR_OTP_LOCK_START	    0x1FFF7A00
+
+#define OTP_LOCK_LOCKED	        0x00
+#define OTP_LOCK_UNLOCKED	    0xFF
+
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -367,4 +367,41 @@ bool Storage::erase(void)
 #endif
 }
 
+
+bool Storage::write_otp(void *buf, uint8_t region, uint8_t size)
+{
+    if (size > 32 || region > 15) {
+        return false;
+    }
+    uint8_t *_buf;
+    uint8_t _size = size;
+    if (size & 1) {
+        _buf = new uint8_t[size + 1];
+        _buf[size] = 0xFF;
+        _size++;
+    } else {
+        _buf = new uint8_t[size];
+    }
+    memcpy(_buf, buf, size);
+
+    return stm32_flash_write(ADDR_OTP_START + (0x20 * (region - 1)), _buf, _size) >= 0;
+}
+
+bool Storage::lock_otp(uint8_t region)
+{
+    if(region > 15) {
+        return false;
+    }
+    uint8_t data = 0x00; 
+    return stm32_flash_write(ADDR_OTP_LOCK_START + (region - 1), &data, 1) > 0;
+}
+
+uint8_t Storage::read_otp(void *buf, uint8_t region, uint8_t size)
+{
+    const uint8_t *b = ((const uint8_t *)ADDR_OTP_START) + (0x20 * (region - 1));
+    const uint8_t *lock = (const uint8_t *)ADDR_OTP_LOCK_START;
+    memcpy(buf, b, size);
+    return lock[region - 1];
+}
+
 #endif // HAL_USE_EMPTY_STORAGE

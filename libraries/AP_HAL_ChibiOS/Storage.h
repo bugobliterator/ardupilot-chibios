@@ -46,7 +46,9 @@ public:
 
     void _timer_tick(void) override;
     bool healthy(void) override;
-
+    bool write_otp(void *buf, uint8_t region, uint8_t size) override;
+    bool lock_otp(uint8_t region) override;
+    uint8_t read_otp(void *buf, uint8_t region, uint8_t size) override;
 private:
     enum class StorageBackend: uint8_t {
         None,
