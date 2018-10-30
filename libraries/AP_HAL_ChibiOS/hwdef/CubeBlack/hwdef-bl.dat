@@ -1,5 +1,5 @@
 # hw definition file for processing by chibios_hwdef.py
-# for The CUBE Black and the Cube Purple hardware
+# for The CUBE Black hardware
 # this is based on fmuv3, but with vendor specific USB IDs
 
 include ../fmuv3/hwdef-bl.dat
