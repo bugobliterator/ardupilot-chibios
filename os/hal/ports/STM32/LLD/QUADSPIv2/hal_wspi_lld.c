@@ -171,6 +171,9 @@ void wspi_lld_stop(WSPIDriver *wspip) {
  * @notapi
  */
 void wspi_lld_command(WSPIDriver *wspip, const wspi_command_t *cmdp) {
+  // Clear Flags from previous trx
+  wspip->qspi->FCR = QUADSPI_FCR_CTEF | QUADSPI_FCR_CTCF |
+                     QUADSPI_FCR_CSMF | QUADSPI_FCR_CTOF;
 
 #if STM32_USE_STM32_D1_WORKAROUND == TRUE
   /* If it is a command without address and alternate phases then the command
@@ -221,14 +224,18 @@ void wspi_lld_send(WSPIDriver *wspip, const wspi_command_t *cmdp,
                   STM32_MDMA_CTCR_SINC_INC;         /* Source incremented.  */
   uint32_t ccr  = STM32_MDMA_CCR_PL(STM32_WSPI_QUADSPI1_MDMA_PRIORITY) |
                   STM32_MDMA_CCR_CTCIE          |   /* On transfer complete.*/
-                  STM32_MDMA_CCR_TCIE;              /* On transfer error.   */
+                  STM32_MDMA_CCR_TEIE;              /* On transfer error.   */
+
+  // Clear Flags from previous trx
+  wspip->qspi->FCR = QUADSPI_FCR_CTEF | QUADSPI_FCR_CTCF |
+                     QUADSPI_FCR_CSMF | QUADSPI_FCR_CTOF;
 
   /* MDMA initializations.*/
   mdmaChannelSetSourceX(wspip->mdma, txbuf);
   mdmaChannelSetDestinationX(wspip->mdma, &wspip->qspi->DR);
   mdmaChannelSetTransactionSizeX(wspip->mdma, n, 0, 0);
   mdmaChannelSetModeX(wspip->mdma, ctcr, ccr);
-  mdmaChannelSetTrigModeX(wspip->mdma, MDMA_REQUEST_QUADSPI_TC);
+  mdmaChannelSetTrigModeX(wspip->mdma, MDMA_REQUEST_QUADSPI_FIFO_TH);
 
   wspip->qspi->DLR = n - 1;
   wspip->qspi->ABR = cmdp->alt;
@@ -265,8 +272,8 @@ void wspi_lld_receive(WSPIDriver *wspip, const wspi_command_t *cmdp,
                   STM32_MDMA_CTCR_DINC_INC      |   /* Destination incr.    */
                   STM32_MDMA_CTCR_SINC_FIXED;       /* Source fixed.        */
   uint32_t ccr  = STM32_MDMA_CCR_PL(STM32_WSPI_QUADSPI1_MDMA_PRIORITY) |
-                  STM32_MDMA_CCR_CTCIE          |   /* On transfer complete.*/
-                  STM32_MDMA_CCR_TCIE;              /* On transfer error.   */
+                  STM32_MDMA_CCR_CTCIE          |   /* On channel transfer complete.*/
+                  STM32_MDMA_CCR_TEIE;              /* On transfer error.   */
 
   /* MDMA initializations.*/
   mdmaChannelSetSourceX(wspip->mdma, &wspip->qspi->DR);
@@ -274,7 +281,7 @@ void wspi_lld_receive(WSPIDriver *wspip, const wspi_command_t *cmdp,
   mdmaChannelSetTransactionSizeX(wspip->mdma, n, 0, 0);
   mdmaChannelSetModeX(wspip->mdma, ctcr, ccr);
 
-  mdmaChannelSetTrigModeX(wspip->mdma, MDMA_REQUEST_QUADSPI_TC);
+  mdmaChannelSetTrigModeX(wspip->mdma, MDMA_REQUEST_QUADSPI_FIFO_TH);
 
   wspip->qspi->DLR = n - 1;
   wspip->qspi->ABR = cmdp->alt;
