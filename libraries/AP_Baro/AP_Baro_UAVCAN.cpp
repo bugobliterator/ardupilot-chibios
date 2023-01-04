@@ -3,18 +3,13 @@
 #if AP_BARO_UAVCAN_ENABLED
 
 #include <AP_CANManager/AP_CANManager.h>
-#include <AP_UAVCAN/AP_UAVCAN.h>
-
-#include <uavcan/equipment/air_data/StaticPressure.hpp>
-#include <uavcan/equipment/air_data/StaticTemperature.hpp>
+#include <AP_BoardConfig/AP_BoardConfig.h>
+#include "AP_Baro_SITL.h"
+#include <AP_Vehicle/AP_Vehicle_Type.h>
 
 extern const AP_HAL::HAL& hal;
 
 #define LOG_TAG "Baro"
-
-//UAVCAN Frontend Registry Binder
-UC_REGISTRY_BINDER(PressureCb, uavcan::equipment::air_data::StaticPressure);
-UC_REGISTRY_BINDER(TemperatureCb, uavcan::equipment::air_data::StaticTemperature);
 
 AP_Baro_UAVCAN::DetectedModules AP_Baro_UAVCAN::_detected_modules[];
 HAL_Semaphore AP_Baro_UAVCAN::_sem_registry;
@@ -31,23 +26,25 @@ void AP_Baro_UAVCAN::subscribe_msgs(AP_UAVCAN* ap_uavcan)
     if (ap_uavcan == nullptr) {
         return;
     }
-
-    auto* node = ap_uavcan->get_node();
-
-    uavcan::Subscriber<uavcan::equipment::air_data::StaticPressure, PressureCb> *pressure_listener;
-    pressure_listener = new uavcan::Subscriber<uavcan::equipment::air_data::StaticPressure, PressureCb>(*node);
-    // Msg Handler
-    const int pressure_listener_res = pressure_listener->start(PressureCb(ap_uavcan, &handle_pressure));
-    if (pressure_listener_res < 0) {
-        AP_HAL::panic("UAVCAN Baro subscriber start problem\n\r");
+#if AP_TEST_DRONECAN_DRIVERS
+    get_uavcan_backend(ap_uavcan, 125, true); // add entry for test driver
+#endif
+    auto *pressure_cb = Canard::allocate_arg_callback(ap_uavcan, &handle_pressure);
+    if (pressure_cb == nullptr) {
+        AP_BoardConfig::allocation_error("pressure_cb");
+    }
+    auto *pressure_sub = new Canard::Subscriber<uavcan_equipment_air_data_StaticPressure_cxx_iface>{*pressure_cb, ap_uavcan->get_driver_index()};
+    if (pressure_sub == nullptr) {
+        AP_BoardConfig::allocation_error("pressure_sub");
     }
 
-    uavcan::Subscriber<uavcan::equipment::air_data::StaticTemperature, TemperatureCb> *temperature_listener;
-    temperature_listener = new uavcan::Subscriber<uavcan::equipment::air_data::StaticTemperature, TemperatureCb>(*node);
-    // Msg Handler
-    const int temperature_listener_res = temperature_listener->start(TemperatureCb(ap_uavcan, &handle_temperature));
-    if (temperature_listener_res < 0) {
-        AP_HAL::panic("UAVCAN Baro subscriber start problem\n\r");
+    auto *temperature_cb = Canard::allocate_arg_callback(ap_uavcan, &handle_temperature);
+    if (temperature_cb == nullptr) {
+        AP_BoardConfig::allocation_error("temperature_cb");
+    }
+    auto *temperature_sub = new Canard::Subscriber<uavcan_equipment_air_data_StaticTemperature_cxx_iface>{*temperature_cb, ap_uavcan->get_driver_index()};
+    if (temperature_sub == nullptr) {
+        AP_BoardConfig::allocation_error("temperature_sub");
     }
 }
 
@@ -82,6 +79,10 @@ AP_Baro_Backend* AP_Baro_UAVCAN::probe(AP_Baro &baro)
                             "Registered UAVCAN Baro Node %d on Bus %d\n",
                             _detected_modules[i].node_id,
                             _detected_modules[i].ap_uavcan->get_driver_index());
+#if AP_TEST_DRONECAN_DRIVERS
+                // send something to the UAVCAN node to initialise the driver
+                hal.scheduler->register_timer_process(FUNCTOR_BIND(backend, &AP_Baro_UAVCAN::update_test_sensor, void));
+#endif
             }
             break;
         }
@@ -137,36 +138,36 @@ void AP_Baro_UAVCAN::_update_and_wrap_accumulator(float *accum, float val, uint8
     }
 }
 
-void AP_Baro_UAVCAN::handle_pressure(AP_UAVCAN* ap_uavcan, uint8_t node_id, const PressureCb &cb)
+void AP_Baro_UAVCAN::handle_pressure(AP_UAVCAN *ap_uavcan, const CanardRxTransfer& transfer, const uavcan_equipment_air_data_StaticPressure &msg)
 {
     AP_Baro_UAVCAN* driver;
     {
         WITH_SEMAPHORE(_sem_registry);
-        driver = get_uavcan_backend(ap_uavcan, node_id, true);
+        driver = get_uavcan_backend(ap_uavcan, transfer.source_node_id, true);
         if (driver == nullptr) {
             return;
         }
     }
     {
         WITH_SEMAPHORE(driver->_sem_baro);
-        _update_and_wrap_accumulator(&driver->_pressure, cb.msg->static_pressure, &driver->_pressure_count, 32);
+        _update_and_wrap_accumulator(&driver->_pressure, msg.static_pressure, &driver->_pressure_count, 32);
         driver->new_pressure = true;
     }
 }
 
-void AP_Baro_UAVCAN::handle_temperature(AP_UAVCAN* ap_uavcan, uint8_t node_id, const TemperatureCb &cb)
+void AP_Baro_UAVCAN::handle_temperature(AP_UAVCAN *ap_uavcan, const CanardRxTransfer& transfer, const uavcan_equipment_air_data_StaticTemperature &msg)
 {
     AP_Baro_UAVCAN* driver;
     {
         WITH_SEMAPHORE(_sem_registry);
-        driver = get_uavcan_backend(ap_uavcan, node_id, false);
+        driver = get_uavcan_backend(ap_uavcan, transfer.source_node_id, false);
         if (driver == nullptr) {
             return;
         }
     }
     {
         WITH_SEMAPHORE(driver->_sem_baro);
-        driver->_temperature = KELVIN_TO_C(cb.msg->static_temperature);
+        driver->_temperature = KELVIN_TO_C(msg.static_temperature);
     }
 }
 
@@ -189,5 +190,47 @@ void AP_Baro_UAVCAN::update(void)
         new_pressure = false;
     }
 }
+
+#if AP_TEST_DRONECAN_DRIVERS
+void AP_Baro_UAVCAN::update_test_sensor() {
+    const uint32_t now = AP_HAL::millis();
+    if ((now - _test_sensor_last_update_ms) < 10) {
+        return;
+    }
+    _test_sensor_last_update_ms = now;
+
+    float sim_alt = AP::sitl()->state.altitude;
+
+    sim_alt += AP::sitl()->baro[_instance].drift * now * 0.001f;
+    sim_alt += AP::sitl()->baro[_instance].noise * rand_float();
+
+#if !APM_BUILD_TYPE(APM_BUILD_ArduSub)
+    float sigma, delta, theta;
+
+    AP_Baro::SimpleAtmosphere(sim_alt * 0.001f, sigma, delta, theta);
+    float p = SSL_AIR_PRESSURE * delta;
+    float T = SSL_AIR_TEMPERATURE * theta;
+
+    AP_Baro_SITL::temperature_adjustment(p, T);
+#else
+    float rho, delta, theta;
+    AP_Baro::SimpleUnderWaterAtmosphere(-sim_alt * 0.001f, rho, delta, theta);
+    float p = SSL_AIR_PRESSURE * delta;
+    float T = SSL_AIR_TEMPERATURE * theta;
+#endif
+
+    // add in correction for wind effects
+    p += AP_Baro_SITL::wind_pressure_correction(_instance);
+
+    static Canard::Publisher<uavcan_equipment_air_data_StaticPressure_cxx_iface> press_pub{CanardInterface::get_test_iface()};
+    static Canard::Publisher<uavcan_equipment_air_data_StaticTemperature_cxx_iface> temp_pub{CanardInterface::get_test_iface()};
+    uavcan_equipment_air_data_StaticPressure press_msg {};
+    press_msg.static_pressure = p;
+    press_pub.broadcast(press_msg);
+    uavcan_equipment_air_data_StaticTemperature temp_msg {};
+    temp_msg.static_temperature = T;
+    temp_pub.broadcast(temp_msg);
+}
+#endif
 
 #endif // AP_BARO_UAVCAN_ENABLED

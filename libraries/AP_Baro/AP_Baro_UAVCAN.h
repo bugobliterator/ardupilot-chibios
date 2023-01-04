@@ -5,9 +5,9 @@
 #if AP_BARO_UAVCAN_ENABLED
 
 #include <AP_UAVCAN/AP_UAVCAN.h>
-
-class PressureCb;
-class TemperatureCb;
+#if AP_TEST_DRONECAN_DRIVERS
+#include <SITL/SITL.h>
+#endif
 
 class AP_Baro_UAVCAN : public AP_Baro_Backend {
 public:
@@ -19,9 +19,12 @@ public:
     static AP_Baro_UAVCAN* get_uavcan_backend(AP_UAVCAN* ap_uavcan, uint8_t node_id, bool create_new);
     static AP_Baro_Backend* probe(AP_Baro &baro);
 
-    static void handle_pressure(AP_UAVCAN* ap_uavcan, uint8_t node_id, const PressureCb &cb);
-    static void handle_temperature(AP_UAVCAN* ap_uavcan, uint8_t node_id, const TemperatureCb &cb);
-
+    static void handle_pressure(AP_UAVCAN *ap_uavcan, const CanardRxTransfer& transfer, const uavcan_equipment_air_data_StaticPressure &msg);
+    static void handle_temperature(AP_UAVCAN *ap_uavcan, const CanardRxTransfer& transfer, const uavcan_equipment_air_data_StaticTemperature &msg);
+#if AP_TEST_DRONECAN_DRIVERS
+    void update_test_sensor();
+    void update_healthy_flag(uint8_t instance) override { _frontend.sensors[instance].healthy = !AP::sitl()->baro[instance].disable; };
+#endif
 private:
 
     static void _update_and_wrap_accumulator(float *accum, float val, uint8_t *count, const uint8_t max_count);
@@ -45,6 +48,9 @@ private:
     } _detected_modules[BARO_MAX_DRIVERS];
 
     static HAL_Semaphore _sem_registry;
+#if AP_TEST_DRONECAN_DRIVERS
+    uint32_t _test_sensor_last_update_ms;
+#endif
 };
 
 #endif  // AP_BARO_UAVCAN_ENABLED
