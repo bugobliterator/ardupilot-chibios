@@ -4,21 +4,11 @@
 
 #include <AP_CANManager/AP_CANManager.h>
 #include <AP_UAVCAN/AP_UAVCAN.h>
+#include <AP_BoardConfig/AP_BoardConfig.h>
 
-#include <uavcan/equipment/air_data/RawAirData.hpp>
-#if AP_AIRSPEED_HYGROMETER_ENABLE
-#include <dronecan/sensors/hygrometer/Hygrometer.hpp>
-#endif
 extern const AP_HAL::HAL& hal;
 
 #define LOG_TAG "AirSpeed"
-
-// Frontend Registry Binders
-UC_REGISTRY_BINDER(AirspeedCb, uavcan::equipment::air_data::RawAirData);
-
-#if AP_AIRSPEED_HYGROMETER_ENABLE
-UC_REGISTRY_BINDER(HygrometerCb, dronecan::sensors::hygrometer::Hygrometer);
-#endif
 
 AP_Airspeed_UAVCAN::DetectedModules AP_Airspeed_UAVCAN::_detected_modules[];
 HAL_Semaphore AP_Airspeed_UAVCAN::_sem_registry;
@@ -33,23 +23,26 @@ void AP_Airspeed_UAVCAN::subscribe_msgs(AP_UAVCAN* ap_uavcan)
     if (ap_uavcan == nullptr) {
         return;
     }
-
-    auto* node = ap_uavcan->get_node();
-
-    uavcan::Subscriber<uavcan::equipment::air_data::RawAirData, AirspeedCb> *airspeed_listener;
-    airspeed_listener = new uavcan::Subscriber<uavcan::equipment::air_data::RawAirData, AirspeedCb>(*node);
-
-    const int airspeed_listener_res = airspeed_listener->start(AirspeedCb(ap_uavcan, &handle_airspeed));
-    if (airspeed_listener_res < 0) {
-        AP_HAL::panic("DroneCAN Airspeed subscriber error \n");
+#if AP_TEST_DRONECAN_DRIVERS
+    get_uavcan_backend(ap_uavcan, 125); // add entry for test driver
+#endif
+    auto *airspeed_cb = Canard::allocate_arg_callback(ap_uavcan, &handle_airspeed);
+    if (airspeed_cb == nullptr) {
+        AP_BoardConfig::allocation_error("airspeed_cb");
+    }
+    auto *airspeed_sub = new Canard::Subscriber<uavcan_equipment_air_data_RawAirData_cxx_iface>{*airspeed_cb, ap_uavcan->get_driver_index()};
+    if (airspeed_sub == nullptr) {
+        AP_BoardConfig::allocation_error("airspeed_sub");
     }
 
 #if AP_AIRSPEED_HYGROMETER_ENABLE
-    uavcan::Subscriber<dronecan::sensors::hygrometer::Hygrometer, HygrometerCb> *hygrometer_listener;
-    hygrometer_listener = new uavcan::Subscriber<dronecan::sensors::hygrometer::Hygrometer, HygrometerCb>(*node);
-    const int hygrometer_listener_res = hygrometer_listener->start(HygrometerCb(ap_uavcan, &handle_hygrometer));
-    if (hygrometer_listener_res < 0) {
-        AP_HAL::panic("DroneCAN Hygrometer subscriber error\n");
+    auto *hygrometer_cb = Canard::allocate_arg_callback(ap_uavcan, &handle_hygrometer);
+    if (hygrometer_cb == nullptr) {
+        AP_BoardConfig::allocation_error("hygrometer_cb");
+    }
+    auto *hygrometer_sub = new Canard::Subscriber<dronecan_sensors_hygrometer_Hygrometer_cxx_iface>{*hygrometer_cb, ap_uavcan->get_driver_index()};
+    if (hygrometer_sub == nullptr) {
+        AP_BoardConfig::allocation_error("hygrometer_sub");
     }
 #endif
 }
@@ -84,6 +77,10 @@ AP_Airspeed_Backend* AP_Airspeed_UAVCAN::probe(AP_Airspeed &_frontend, uint8_t _
                                    _detected_modules[i].node_id,
                                    _detected_modules[i].ap_uavcan->get_driver_index());
                 backend->set_bus_id(bus_id);
+#if AP_TEST_DRONECAN_DRIVERS
+                // send something to the UAVCAN node to initialise the driver
+                hal.scheduler->register_timer_process(FUNCTOR_BIND(backend, &AP_Airspeed_UAVCAN::update_test_sensor, void));
+#endif
             }
             break;
         }
@@ -128,18 +125,18 @@ AP_Airspeed_UAVCAN* AP_Airspeed_UAVCAN::get_uavcan_backend(AP_UAVCAN* ap_uavcan,
     return nullptr;
 }
 
-void AP_Airspeed_UAVCAN::handle_airspeed(AP_UAVCAN* ap_uavcan, uint8_t node_id, const AirspeedCb &cb)
+void AP_Airspeed_UAVCAN::handle_airspeed(AP_UAVCAN *ap_uavcan, const CanardRxTransfer& transfer, const uavcan_equipment_air_data_RawAirData &msg)
 {
     WITH_SEMAPHORE(_sem_registry);
 
-    AP_Airspeed_UAVCAN* driver = get_uavcan_backend(ap_uavcan, node_id);
+    AP_Airspeed_UAVCAN* driver = get_uavcan_backend(ap_uavcan, transfer.source_node_id);
 
     if (driver != nullptr) {
         WITH_SEMAPHORE(driver->_sem_airspeed);
-        driver->_pressure = cb.msg->differential_pressure;
-        if (!isnan(cb.msg->static_air_temperature) &&
-            cb.msg->static_air_temperature > 0) {
-            driver->_temperature = KELVIN_TO_C(cb.msg->static_air_temperature);
+        driver->_pressure = msg.differential_pressure;
+        if (!isnan(msg.static_air_temperature) &&
+            msg.static_air_temperature > 0) {
+            driver->_temperature = KELVIN_TO_C(msg.static_air_temperature);
             driver->_have_temperature = true;
         }
         driver->_last_sample_time_ms = AP_HAL::millis();
@@ -147,16 +144,16 @@ void AP_Airspeed_UAVCAN::handle_airspeed(AP_UAVCAN* ap_uavcan, uint8_t node_id, 
 }
 
 #if AP_AIRSPEED_HYGROMETER_ENABLE
-void AP_Airspeed_UAVCAN::handle_hygrometer(AP_UAVCAN* ap_uavcan, uint8_t node_id, const HygrometerCb &cb)
+void AP_Airspeed_UAVCAN::handle_hygrometer(AP_UAVCAN *ap_uavcan, const CanardRxTransfer& transfer, const dronecan_sensors_hygrometer_Hygrometer &msg)
 {
     WITH_SEMAPHORE(_sem_registry);
 
-    AP_Airspeed_UAVCAN* driver = get_uavcan_backend(ap_uavcan, node_id);
+    AP_Airspeed_UAVCAN* driver = get_uavcan_backend(ap_uavcan, transfer.source_node_id);
 
     if (driver != nullptr) {
         WITH_SEMAPHORE(driver->_sem_airspeed);
-        driver->_hygrometer.temperature = KELVIN_TO_C(cb.msg->temperature);
-        driver->_hygrometer.humidity = cb.msg->humidity;
+        driver->_hygrometer.temperature = KELVIN_TO_C(msg.temperature);
+        driver->_hygrometer.humidity = msg.humidity;
         driver->_hygrometer.last_sample_ms = AP_HAL::millis();
     }
 }
@@ -213,5 +210,24 @@ bool AP_Airspeed_UAVCAN::get_hygrometer(uint32_t &last_sample_ms, float &tempera
     return true;
 }
 #endif // AP_AIRSPEED_HYGROMETER_ENABLE
+
+#if AP_TEST_DRONECAN_DRIVERS
+void AP_Airspeed_UAVCAN::update_test_sensor() {
+    uavcan_equipment_air_data_RawAirData msg {};
+    msg.differential_pressure = AP::sitl()->state.airspeed_raw_pressure[get_instance()];
+
+    // this was mostly swiped from SIM_Airspeed_DLVR:
+    const float sim_alt = AP::sitl()->state.altitude;
+
+    float sigma, delta, theta;
+    AP_Baro::SimpleAtmosphere(sim_alt * 0.001f, sigma, delta, theta);
+
+    // To Do: Add a sensor board temperature offset parameter
+    msg.static_air_temperature = SSL_AIR_TEMPERATURE * theta + 25.0;
+
+    static Canard::Publisher<uavcan_equipment_air_data_RawAirData_cxx_iface> raw_air_pub{CanardInterface::get_test_iface()};
+    raw_air_pub.broadcast(msg);
+}
+#endif
 
 #endif // AP_AIRSPEED_UAVCAN_ENABLED

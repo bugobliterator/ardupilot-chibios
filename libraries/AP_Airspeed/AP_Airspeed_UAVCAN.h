@@ -11,9 +11,9 @@
 #include "AP_Airspeed_Backend.h"
 
 #include <AP_UAVCAN/AP_UAVCAN.h>
-
-class AirspeedCb;
-class HygrometerCb;
+#if AP_TEST_DRONECAN_DRIVERS
+#include <SITL/SITL.h>
+#endif
 
 class AP_Airspeed_UAVCAN : public AP_Airspeed_Backend {
 public:
@@ -36,10 +36,13 @@ public:
 
     static AP_Airspeed_Backend* probe(AP_Airspeed &_fronted, uint8_t _instance, uint32_t previous_devid);
 
+#if AP_TEST_DRONECAN_DRIVERS
+    void update_test_sensor();
+#endif
 private:
 
-    static void handle_airspeed(AP_UAVCAN* ap_uavcan, uint8_t node_id, const AirspeedCb &cb);
-    static void handle_hygrometer(AP_UAVCAN* ap_uavcan, uint8_t node_id, const HygrometerCb &cb);
+    static void handle_airspeed(AP_UAVCAN *ap_uavcan, const CanardRxTransfer& transfer, const uavcan_equipment_air_data_RawAirData &msg);
+    static void handle_hygrometer(AP_UAVCAN *ap_uavcan, const CanardRxTransfer& transfer, const dronecan_sensors_hygrometer_Hygrometer &msg);
 
     static AP_Airspeed_UAVCAN* get_uavcan_backend(AP_UAVCAN* ap_uavcan, uint8_t node_id);
 
@@ -65,6 +68,9 @@ private:
 
     static HAL_Semaphore _sem_registry;
     bool _have_temperature;
+#if AP_TEST_DRONECAN_DRIVERS
+    uint32_t _test_sensor_last_update_ms;
+#endif
 };
 
 
