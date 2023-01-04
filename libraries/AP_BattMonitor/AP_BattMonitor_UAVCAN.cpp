@@ -12,11 +12,6 @@
 #include <AP_UAVCAN/AP_UAVCAN.h>
 #include <AP_BoardConfig/AP_BoardConfig.h>
 
-#include <uavcan/equipment/power/BatteryInfo.hpp>
-#include <ardupilot/equipment/power/BatteryInfoAux.hpp>
-#include <mppt/Stream.hpp>
-#include <mppt/OutputEnable.hpp>
-
 #define LOG_TAG "BattMon"
 
 extern const AP_HAL::HAL& hal;
@@ -34,10 +29,6 @@ const AP_Param::GroupInfo AP_BattMonitor_UAVCAN::var_info[] = {
 
     AP_GROUPEND
 };
-
-UC_REGISTRY_BINDER(BattInfoCb, uavcan::equipment::power::BatteryInfo);
-UC_REGISTRY_BINDER(BattInfoAuxCb, ardupilot::equipment::power::BatteryInfoAux);
-UC_REGISTRY_BINDER(MpptStreamCb, mppt::Stream);
 
 /// Constructor
 AP_BattMonitor_UAVCAN::AP_BattMonitor_UAVCAN(AP_BattMonitor &mon, AP_BattMonitor::BattMonitor_State &mon_state, BattMonitor_UAVCAN_Type type, AP_BattMonitor_Params &params) :
@@ -57,33 +48,31 @@ void AP_BattMonitor_UAVCAN::subscribe_msgs(AP_UAVCAN* ap_uavcan)
         return;
     }
 
-    auto* node = ap_uavcan->get_node();
-
-    uavcan::Subscriber<uavcan::equipment::power::BatteryInfo, BattInfoCb> *battinfo_listener;
-    battinfo_listener = new uavcan::Subscriber<uavcan::equipment::power::BatteryInfo, BattInfoCb>(*node);
-    // Backend Msg Handler
-    const int battinfo_listener_res = battinfo_listener->start(BattInfoCb(ap_uavcan, &handle_battery_info_trampoline));
-    if (battinfo_listener_res < 0) {
-        AP_BoardConfig::allocation_error("UAVCAN BatteryInfo subscriber start problem\n\r");
-        return;
+    auto *battinfo_cb = Canard::allocate_arg_callback(ap_uavcan, &handle_battery_info_trampoline);
+    if (battinfo_cb == nullptr) {
+        AP_BoardConfig::allocation_error("battinfo_cb");
+    }
+    auto *battinfo_sub = new Canard::Subscriber<uavcan_equipment_power_BatteryInfo_cxx_iface>{*battinfo_cb, ap_uavcan->get_driver_index()};
+    if (battinfo_sub == nullptr) {
+        AP_BoardConfig::allocation_error("battinfo_sub");
     }
 
-    uavcan::Subscriber<ardupilot::equipment::power::BatteryInfoAux, BattInfoAuxCb> *battinfo_aux_listener;
-    battinfo_aux_listener = new uavcan::Subscriber<ardupilot::equipment::power::BatteryInfoAux, BattInfoAuxCb>(*node);
-    // Backend Msg Handler
-    const int battinfo_aux_listener_res = battinfo_aux_listener->start(BattInfoAuxCb(ap_uavcan, &handle_battery_info_aux_trampoline));
-    if (battinfo_aux_listener_res < 0) {
-        AP_BoardConfig::allocation_error("UAVCAN BatteryInfoAux subscriber start problem");
-        return;
+    auto *battinfo_aux_cb = Canard::allocate_arg_callback(ap_uavcan, &handle_battery_info_aux_trampoline);
+    if (battinfo_aux_cb == nullptr) {
+        AP_BoardConfig::allocation_error("battinfo_aux_cb");
     }
-    
-    uavcan::Subscriber<mppt::Stream, MpptStreamCb> *mppt_stream_listener;
-    mppt_stream_listener = new uavcan::Subscriber<mppt::Stream, MpptStreamCb>(*node);
-    // Backend Msg Handler
-    const int mppt_stream_listener_res = mppt_stream_listener->start(MpptStreamCb(ap_uavcan, &handle_mppt_stream_trampoline));
-    if (mppt_stream_listener_res < 0) {
-        AP_BoardConfig::allocation_error("UAVCAN Mppt::Stream subscriber start problem");
-        return;
+    auto *battinfo_aux_sub = new Canard::Subscriber<ardupilot_equipment_power_BatteryInfoAux_cxx_iface>{*battinfo_aux_cb, ap_uavcan->get_driver_index()};
+    if (battinfo_aux_sub == nullptr) {
+        AP_BoardConfig::allocation_error("battinfo_aux_sub");
+    }
+
+    auto *mppt_stream_cb = Canard::allocate_arg_callback(ap_uavcan, &handle_mppt_stream_trampoline);
+    if (mppt_stream_cb == nullptr) {
+        AP_BoardConfig::allocation_error("mppt_stream_cb");
+    }
+    auto *mppt_stream_sub = new Canard::Subscriber<mppt_Stream_cxx_iface>{*mppt_stream_cb, ap_uavcan->get_driver_index()};
+    if (mppt_stream_sub == nullptr) {
+        AP_BoardConfig::allocation_error("mppt_stream_sub");
     }
 }
 
@@ -115,7 +104,6 @@ AP_BattMonitor_UAVCAN* AP_BattMonitor_UAVCAN::get_uavcan_backend(AP_UAVCAN* ap_u
             batmon->_ap_uavcan = ap_uavcan;
             batmon->_node_id = node_id;
             batmon->_instance = i;
-            batmon->_node = ap_uavcan->get_node();
             batmon->init();
             AP::can().log_text(AP_CANManager::LOG_INFO,
                             LOG_TAG,
@@ -128,13 +116,13 @@ AP_BattMonitor_UAVCAN* AP_BattMonitor_UAVCAN::get_uavcan_backend(AP_UAVCAN* ap_u
     return nullptr;
 }
 
-void AP_BattMonitor_UAVCAN::handle_battery_info(const BattInfoCb &cb)
+void AP_BattMonitor_UAVCAN::handle_battery_info(const uavcan_equipment_power_BatteryInfo &msg)
 {
-    update_interim_state(cb.msg->voltage, cb.msg->current, cb.msg->temperature, cb.msg->state_of_charge_pct); 
+    update_interim_state(msg.voltage, msg.current, msg.temperature, msg.state_of_charge_pct); 
 
     WITH_SEMAPHORE(_sem_battmon);
-    _remaining_capacity_wh = cb.msg->remaining_capacity_wh;
-    _full_charge_capacity_wh = cb.msg->full_charge_capacity_wh;
+    _remaining_capacity_wh = msg.remaining_capacity_wh;
+    _full_charge_capacity_wh = msg.full_charge_capacity_wh;
 }
 
 void AP_BattMonitor_UAVCAN::update_interim_state(const float voltage, const float current, const float temperature_K, const uint8_t soc)
@@ -165,18 +153,18 @@ void AP_BattMonitor_UAVCAN::update_interim_state(const float voltage, const floa
     _interim_state.healthy = true;
 }
 
-void AP_BattMonitor_UAVCAN::handle_battery_info_aux(const BattInfoAuxCb &cb)
+void AP_BattMonitor_UAVCAN::handle_battery_info_aux(const ardupilot_equipment_power_BatteryInfoAux &msg)
 {
     WITH_SEMAPHORE(_sem_battmon);
-    uint8_t cell_count = MIN(ARRAY_SIZE(_interim_state.cell_voltages.cells), cb.msg->voltage_cell.size());
-    float remaining_capacity_ah = _remaining_capacity_wh / cb.msg->nominal_voltage;
-    float full_charge_capacity_ah = _full_charge_capacity_wh / cb.msg->nominal_voltage;
+    uint8_t cell_count = MIN(ARRAY_SIZE(_interim_state.cell_voltages.cells), msg.voltage_cell.len);
+    float remaining_capacity_ah = _remaining_capacity_wh / msg.nominal_voltage;
+    float full_charge_capacity_ah = _full_charge_capacity_wh / msg.nominal_voltage;
 
-    _cycle_count = cb.msg->cycle_count;
+    _cycle_count = msg.cycle_count;
     for (uint8_t i = 0; i < cell_count; i++) {
-        _interim_state.cell_voltages.cells[i] = cb.msg->voltage_cell[i] * 1000;
+        _interim_state.cell_voltages.cells[i] = msg.voltage_cell.data[i] * 1000;
     }
-    _interim_state.is_powering_off = cb.msg->is_powering_off;
+    _interim_state.is_powering_off = msg.is_powering_off;
     _interim_state.consumed_mah = (full_charge_capacity_ah - remaining_capacity_ah) * 1000;
     _interim_state.consumed_wh = _full_charge_capacity_wh - _remaining_capacity_wh;
     _interim_state.time_remaining =  is_zero(_interim_state.current_amps) ? 0 : (remaining_capacity_ah / _interim_state.current_amps * 3600);
@@ -188,17 +176,17 @@ void AP_BattMonitor_UAVCAN::handle_battery_info_aux(const BattInfoAuxCb &cb)
     _has_battery_info_aux = true;
 }
 
-void AP_BattMonitor_UAVCAN::handle_mppt_stream(const MpptStreamCb &cb)
+void AP_BattMonitor_UAVCAN::handle_mppt_stream(const mppt_Stream &msg)
 {
     const bool use_input_value = (uint32_t(_params._options.get()) & uint32_t(AP_BattMonitor_Params::Options::MPPT_Use_Input_Value)) != 0;
-    const float voltage = use_input_value ? cb.msg->input_voltage : cb.msg->output_voltage;
-    const float current = use_input_value ? cb.msg->input_current : cb.msg->output_current;
+    const float voltage = use_input_value ? msg.input_voltage : msg.output_voltage;
+    const float current = use_input_value ? msg.input_current : msg.output_current;
 
     // use an invalid soc so we use the library calculated one
     const uint8_t soc = 127;
 
     // convert C to Kelvin
-    const float temperature_K = isnanf(cb.msg->temperature) ? 0 : C_TO_KELVIN(cb.msg->temperature);
+    const float temperature_K = isnanf(msg.temperature) ? 0 : C_TO_KELVIN(msg.temperature);
 
     update_interim_state(voltage, current, temperature_K, soc); 
 
@@ -209,34 +197,34 @@ void AP_BattMonitor_UAVCAN::handle_mppt_stream(const MpptStreamCb &cb)
         mppt_set_bootup_powered_state();
     }
 
-    mppt_check_and_report_faults(cb.msg->fault_flags);
+    mppt_check_and_report_faults(msg.fault_flags);
 }
 
-void AP_BattMonitor_UAVCAN::handle_battery_info_trampoline(AP_UAVCAN* ap_uavcan, uint8_t node_id, const BattInfoCb &cb)
+void AP_BattMonitor_UAVCAN::handle_battery_info_trampoline(AP_UAVCAN *ap_uavcan, const CanardRxTransfer& transfer, const uavcan_equipment_power_BatteryInfo &msg)
 {
-    AP_BattMonitor_UAVCAN* driver = get_uavcan_backend(ap_uavcan, node_id, cb.msg->battery_id);
+    AP_BattMonitor_UAVCAN* driver = get_uavcan_backend(ap_uavcan, transfer.source_node_id, msg.battery_id);
     if (driver == nullptr) {
         return;
     }
-    driver->handle_battery_info(cb);
+    driver->handle_battery_info(msg);
 }
 
-void AP_BattMonitor_UAVCAN::handle_battery_info_aux_trampoline(AP_UAVCAN* ap_uavcan, uint8_t node_id, const BattInfoAuxCb &cb)
+void AP_BattMonitor_UAVCAN::handle_battery_info_aux_trampoline(AP_UAVCAN *ap_uavcan, const CanardRxTransfer& transfer, const ardupilot_equipment_power_BatteryInfoAux &msg)
 {
-    AP_BattMonitor_UAVCAN* driver = get_uavcan_backend(ap_uavcan, node_id, cb.msg->battery_id);
+    AP_BattMonitor_UAVCAN* driver = get_uavcan_backend(ap_uavcan, transfer.source_node_id, msg.battery_id);
     if (driver == nullptr) {
         return;
     }
-    driver->handle_battery_info_aux(cb);
+    driver->handle_battery_info_aux(msg);
 }
 
-void AP_BattMonitor_UAVCAN::handle_mppt_stream_trampoline(AP_UAVCAN* ap_uavcan, uint8_t node_id, const MpptStreamCb &cb)
+void AP_BattMonitor_UAVCAN::handle_mppt_stream_trampoline(AP_UAVCAN *ap_uavcan, const CanardRxTransfer& transfer, const mppt_Stream &msg)
 {
-    AP_BattMonitor_UAVCAN* driver = get_uavcan_backend(ap_uavcan, node_id, node_id);
+    AP_BattMonitor_UAVCAN* driver = get_uavcan_backend(ap_uavcan, transfer.source_node_id, transfer.source_node_id);
     if (driver == nullptr) {
         return;
     }
-    driver->handle_mppt_stream(cb);
+    driver->handle_mppt_stream(msg);
 }
 
 // read - read the voltage and current
@@ -343,7 +331,7 @@ void AP_BattMonitor_UAVCAN::mppt_set_armed_powered_state()
 // force should be true to force sending the state change request to the MPPT
 void AP_BattMonitor_UAVCAN::mppt_set_powered_state(bool power_on, bool force)
 {
-    if (_ap_uavcan == nullptr || _node == nullptr || !_mppt.is_detected) {
+    if (_ap_uavcan == nullptr || !_mppt.is_detected) {
         return;
     }
 
@@ -356,13 +344,17 @@ void AP_BattMonitor_UAVCAN::mppt_set_powered_state(bool power_on, bool force)
 
     GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Battery %u: powering %s", (unsigned)_instance+1, _mppt.powered_state ? "ON" : "OFF");
 
-    mppt::OutputEnable::Request request;
+    mppt_OutputEnableRequest request;
     request.enable = _mppt.powered_state;
     request.disable = !request.enable;
 
-    uavcan::ServiceClient<mppt::OutputEnable> client(*_node);
-    client.setCallback([](const uavcan::ServiceCallResult<mppt::OutputEnable>& handle_mppt_enable_output_response){});
-    client.call(_node_id, request);
+    if (mppt_outputenable_client == nullptr) {
+        mppt_outputenable_client = new Canard::Client<mppt_OutputEnable_cxx_iface>{_ap_uavcan->get_canard_iface(), mppt_outputenable_res_cb};
+        if (mppt_outputenable_client == nullptr) {
+            return;
+        }
+    }
+    mppt_outputenable_client->request(_node_id, request);
 }
 
 // report changes in MPPT faults
