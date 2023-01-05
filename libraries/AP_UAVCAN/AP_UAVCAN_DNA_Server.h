@@ -3,18 +3,17 @@
 #include <AP_HAL/Semaphores.h>
 
 #if HAL_ENABLE_LIBUAVCAN_DRIVERS
-#include <uavcan/uavcan.hpp>
 #include <AP_Common/Bitmask.h>
 #include <StorageManager/StorageManager.h>
 #include <AP_CANManager/AP_CANManager.h>
+#include <cubeframework/publisher.h>
+#include <cubeframework/subscriber.h>
+#include <cubeframework/service_client.h>
+#include "AP_CubeFramework_iface.h"
+#include <dronecan_msgs.h>
 
-//Forward declaring classes
-class AllocationCb;
-class NodeStatusCb;
-class NodeInfoCb;
-class GetNodeInfoCb;
 class AP_UAVCAN;
-
+//Forward declaring classes
 class AP_UAVCAN_DNA_Server
 {
     StorageAccess storage;
@@ -34,7 +33,7 @@ class AP_UAVCAN_DNA_Server
 
     uint32_t last_verification_request;
     uint8_t curr_verifying_node;
-    uint8_t self_node_id[HAL_MAX_CAN_PROTOCOL_DRIVERS];
+    uint8_t self_node_id;
     bool nodeInfo_resp_rcvd;
 
     Bitmask<128> occupation_mask;
@@ -89,24 +88,30 @@ class AP_UAVCAN_DNA_Server
     //Look in the storage and check if there's a valid Server Record there
     bool isValidNodeDataAvailable(uint8_t node_id);
 
-    static void trampoline_handleNodeInfo(AP_UAVCAN* ap_uavcan, uint8_t node_id, const GetNodeInfoCb& resp);
-    static void trampoline_handleAllocation(AP_UAVCAN* ap_uavcan, uint8_t node_id, const AllocationCb &cb);
-    static void trampoline_handleNodeStatus(AP_UAVCAN* ap_uavcan, uint8_t node_id, const NodeStatusCb &cb);
-
-
     HAL_Semaphore storage_sem;
-    AP_UAVCAN *_ap_uavcan;
-    uint8_t driver_index;
+    AP_UAVCAN &_AP_UAVCAN;
+    CanardInterface &_canard_iface;
+
+    CubeFramework::Publisher<uavcan_protocol_dynamic_node_id_Allocation_cxx_iface> allocation_pub{_canard_iface};
+
+    CubeFramework::ObjCallback<AP_UAVCAN_DNA_Server, uavcan_protocol_dynamic_node_id_Allocation> allocation_cb{this, &AP_UAVCAN_DNA_Server::handleAllocation};
+    CubeFramework::Subscriber<uavcan_protocol_dynamic_node_id_Allocation_cxx_iface> allocation_sub;
+
+    CubeFramework::ObjCallback<AP_UAVCAN_DNA_Server, uavcan_protocol_NodeStatus> node_status_cb{this, &AP_UAVCAN_DNA_Server::handleNodeStatus};
+    CubeFramework::Subscriber<uavcan_protocol_NodeStatus_cxx_iface> node_status_sub;
+
+    CubeFramework::ObjCallback<AP_UAVCAN_DNA_Server, uavcan_protocol_GetNodeInfoResponse> node_info_cb{this, &AP_UAVCAN_DNA_Server::handleNodeInfo};
+    CubeFramework::Client<uavcan_protocol_GetNodeInfo_cxx_iface> node_info_client;
 
 public:
-    AP_UAVCAN_DNA_Server(AP_UAVCAN *ap_uavcan, StorageAccess _storage);
+    AP_UAVCAN_DNA_Server(AP_UAVCAN &AP_UAVCAN);
 
 
     // Do not allow copies
     CLASS_NO_COPY(AP_UAVCAN_DNA_Server);
 
     //Initialises publisher and Server Record for specified uavcan driver
-    bool init();
+    bool init(uint8_t own_unique_id[], uint8_t own_unique_id_len, uint8_t node_id);
 
     //Reset the Server Record
     void reset();
@@ -119,15 +124,15 @@ public:
 
     /* Subscribe to the messages to be handled for maintaining and allocating
     Node ID list */
-    static void subscribe_msgs(AP_UAVCAN* ap_uavcan);
+    static void subscribe_msgs(AP_UAVCAN* AP_UAVCAN);
 
     //report the server state, along with failure message if any
     bool prearm_check(char* fail_msg, uint8_t fail_msg_len) const;
 
     //Callbacks
-    void handleAllocation(uint8_t node_id, const AllocationCb &cb);
-    void handleNodeStatus(uint8_t node_id, const NodeStatusCb &cb);
-    void handleNodeInfo(uint8_t node_id, uint8_t unique_id[], char name[], uint8_t major, uint8_t minor, uint32_t vcs_commit);
+    void handleAllocation(const CanardRxTransfer& transfer, const uavcan_protocol_dynamic_node_id_Allocation& msg);
+    void handleNodeStatus(const CanardRxTransfer& transfer, const uavcan_protocol_NodeStatus& msg);
+    void handleNodeInfo(const CanardRxTransfer& transfer, const uavcan_protocol_GetNodeInfoResponse& rsp);
 
     //Run through the list of seen node ids for verification
     void verify_nodes();
