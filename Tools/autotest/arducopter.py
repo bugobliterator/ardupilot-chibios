@@ -2538,6 +2538,7 @@ class AutoTestCopter(AutoTest):
             "GPS_TYPE2": 9,
             "SIM_GPS2_DISABLE": 0,
             "ARSPD_TYPE": 8,
+            "RNGFND1_TYPE": 24,
         })
 
         self.context_push()
