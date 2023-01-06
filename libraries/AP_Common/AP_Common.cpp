@@ -74,7 +74,7 @@ bool hex_to_uint8(uint8_t a, uint8_t &res)
 /*
   strncpy without the warning for not leaving room for nul termination
  */
-void strncpy_noterm(char *dest, const char *src, size_t n)
+size_t strncpy_noterm(char *dest, const char *src, size_t n)
 {
     size_t len = strnlen(src, n);
     if (len < n) {
@@ -82,6 +82,7 @@ void strncpy_noterm(char *dest, const char *src, size_t n)
         len++;
     }
     memcpy(dest, src, len);
+    return len;
 }
 
 /**
