@@ -112,7 +112,7 @@ def waf_configure(board,
                   coverage=False,
                   ekf_single=False,
                   postype_single=False,
-                  sitl_32bit=False,
+                  force_32bit=False,
                   extra_args=[],
                   extra_hwdef=None,
                   ubsan=False,
@@ -129,8 +129,8 @@ def waf_configure(board,
         cmd_configure.append('--ekf-single')
     if postype_single:
         cmd_configure.append('--postype-single')
-    if sitl_32bit:
-        cmd_configure.append('--sitl-32bit')
+    if force_32bit:
+        cmd_configure.append('--force-32bit')
     if ubsan:
         cmd_configure.append('--ubsan')
     if ubsan_abort:
@@ -171,7 +171,7 @@ def build_SITL(
         j=None,
         math_check_indexes=False,
         postype_single=False,
-        sitl_32bit=False,
+        force_32bit=False,
         ubsan=False,
         ubsan_abort=False,
 ):
@@ -185,7 +185,7 @@ def build_SITL(
                       ekf_single=ekf_single,
                       postype_single=postype_single,
                       coverage=coverage,
-                      sitl_32bit=sitl_32bit,
+                      force_32bit=force_32bit,
                       ubsan=ubsan,
                       ubsan_abort=ubsan_abort,
                       extra_defines=extra_defines,
@@ -204,7 +204,7 @@ def build_SITL(
 
 
 def build_examples(board, j=None, debug=False, clean=False, configure=True, math_check_indexes=False, coverage=False,
-                   ekf_single=False, postype_single=False, sitl_32bit=False, ubsan=False, ubsan_abort=False,
+                   ekf_single=False, postype_single=False, force_32bit=False, ubsan=False, ubsan_abort=False,
                    extra_configure_args=[]):
     # first configure
     if configure:
@@ -215,7 +215,7 @@ def build_examples(board, j=None, debug=False, clean=False, configure=True, math
                       ekf_single=ekf_single,
                       postype_single=postype_single,
                       coverage=coverage,
-                      sitl_32bit=sitl_32bit,
+                      force_32bit=force_32bit,
                       ubsan=ubsan,
                       ubsan_abort=ubsan_abort,
                       extra_args=extra_configure_args)
@@ -253,7 +253,7 @@ def build_tests(board,
                 coverage=False,
                 ekf_single=False,
                 postype_single=False,
-                sitl_32bit=False,
+                force_32bit=False,
                 ubsan=False,
                 ubsan_abort=False,
                 extra_configure_args=[]):
@@ -267,7 +267,7 @@ def build_tests(board,
                       ekf_single=ekf_single,
                       postype_single=postype_single,
                       coverage=coverage,
-                      sitl_32bit=sitl_32bit,
+                      force_32bit=force_32bit,
                       ubsan=ubsan,
                       ubsan_abort=ubsan_abort,
                       extra_args=extra_configure_args)
