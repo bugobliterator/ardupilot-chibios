@@ -1076,7 +1076,7 @@ void AP_UAVCAN::send_reboot_request(uint8_t node_id)
 {
     // uavcan_protocol_RestartNode_Request request;
     // request.magic_number = UAVCAN_PROTOCOL_RESTARTNODE_REQUEST_MAGIC_NUMBER;
-    // CubeFramework::Client<uavcan::protocol::RestartNode> client(*_node);
+    // Canard::Client<uavcan::protocol::RestartNode> client(*_node);
     // client.setCallback([](const uavcan::ServiceCallResult<uavcan::protocol::RestartNode>& call_result){});
 
     // client.call(node_id, request);

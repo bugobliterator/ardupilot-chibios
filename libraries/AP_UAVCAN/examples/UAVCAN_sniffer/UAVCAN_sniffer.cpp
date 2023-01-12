@@ -85,8 +85,8 @@ MSG_CB(com_hex_equipment_flow_Measurement, Measurement);
 uavcan_protocol_NodeStatus node_status;
 uavcan_protocol_GetNodeInfoResponse node_info;
 CanardInterface *_uavcan_iface_mgr;
-CubeFramework::Publisher<uavcan_protocol_NodeStatus_cxx_iface> *node_status_pub;
-CubeFramework::Server<uavcan_protocol_GetNodeInfo_cxx_iface> *node_info_srv;
+Canard::Publisher<uavcan_protocol_NodeStatus_cxx_iface> *node_status_pub;
+Canard::Server<uavcan_protocol_GetNodeInfo_cxx_iface> *node_info_srv;
 
 static void cb_GetNodeInfoRequest(const CanardRxTransfer &transfer, const uavcan_protocol_GetNodeInfoRequest& msg)
 {
@@ -123,12 +123,12 @@ void UAVCAN_sniffer::init(void)
 
     _uavcan_iface_mgr->init(node_memory_pool, sizeof(node_memory_pool), 9);
 
-    node_status_pub = new CubeFramework::Publisher<uavcan_protocol_NodeStatus_cxx_iface>{*_uavcan_iface_mgr};
+    node_status_pub = new Canard::Publisher<uavcan_protocol_NodeStatus_cxx_iface>{*_uavcan_iface_mgr};
     if (node_status_pub == nullptr) {
         return;
     }
 
-    node_info_srv = new CubeFramework::Server<uavcan_protocol_GetNodeInfo_cxx_iface>{*_uavcan_iface_mgr, *CubeFramework::allocate_static_callback(cb_GetNodeInfoRequest)};
+    node_info_srv = new Canard::Server<uavcan_protocol_GetNodeInfo_cxx_iface>{*_uavcan_iface_mgr, *Canard::allocate_static_callback(cb_GetNodeInfoRequest)};
     if (node_info_srv == nullptr) {
         return;
     }
@@ -141,7 +141,7 @@ void UAVCAN_sniffer::init(void)
     node_info.hardware_version.major = AP_UAVCAN_HW_VERS_MAJOR;
     node_info.hardware_version.minor = AP_UAVCAN_HW_VERS_MINOR;
 
-#define START_CB(mtype, cbname) (new CubeFramework::Subscriber<mtype ## _cxx_iface>{*CubeFramework::allocate_static_callback(cb_ ## cbname),driver_index})
+#define START_CB(mtype, cbname) (new Canard::Subscriber<mtype ## _cxx_iface>{*Canard::allocate_static_callback(cb_ ## cbname),driver_index})
 
     START_CB(uavcan_protocol_NodeStatus, NodeStatus);
     START_CB(uavcan_equipment_gnss_Fix2, Fix2);

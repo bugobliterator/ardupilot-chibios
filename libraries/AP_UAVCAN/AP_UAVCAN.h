@@ -20,16 +20,16 @@
 
 #if HAL_ENABLE_LIBUAVCAN_DRIVERS
 
-#include "AP_CubeFramework_iface.h"
+#include "AP_Canard_iface.h"
 #include <AP_CANManager/AP_CANManager.h>
 #include <AP_HAL/Semaphores.h>
 #include <AP_Param/AP_Param.h>
 #include <AP_ESC_Telem/AP_ESC_Telem_Backend.h>
 #include <SRV_Channel/SRV_Channel.h>
-#include <cubeframework/publisher.h>
-#include <cubeframework/subscriber.h>
-#include <cubeframework/service_client.h>
-#include <cubeframework/service_server.h>
+#include <canard/publisher.h>
+#include <canard/subscriber.h>
+#include <canard/service_client.h>
+#include <canard/service_server.h>
 #include <stdio.h>
 #include "AP_UAVCAN_DNA_Server.h"
 #include <canard.h>
@@ -246,45 +246,45 @@ private:
     uavcan_protocol_NodeStatus node_status_msg;
 
     CanardInterface canard_iface;
-    CubeFramework::Publisher<uavcan_protocol_NodeStatus_cxx_iface> node_status{canard_iface};
-    CubeFramework::Publisher<uavcan_equipment_actuator_ArrayCommand_cxx_iface> act_out_array{canard_iface};
-    CubeFramework::Publisher<uavcan_equipment_esc_RawCommand_cxx_iface> esc_raw{canard_iface};
-    CubeFramework::Publisher<uavcan_equipment_indication_LightsCommand_cxx_iface> rgb_led{canard_iface};
-    CubeFramework::Publisher<uavcan_equipment_indication_BeepCommand_cxx_iface> buzzer{canard_iface};
-    CubeFramework::Publisher<ardupilot_indication_SafetyState_cxx_iface> safety_state{canard_iface};
-    CubeFramework::Publisher<uavcan_equipment_safety_ArmingStatus_cxx_iface> arming_status{canard_iface};
-    CubeFramework::Publisher<uavcan_equipment_gnss_RTCMStream_cxx_iface> rtcm_stream{canard_iface};
-    CubeFramework::Publisher<ardupilot_indication_NotifyState_cxx_iface> notify_state{canard_iface};
+    Canard::Publisher<uavcan_protocol_NodeStatus_cxx_iface> node_status{canard_iface};
+    Canard::Publisher<uavcan_equipment_actuator_ArrayCommand_cxx_iface> act_out_array{canard_iface};
+    Canard::Publisher<uavcan_equipment_esc_RawCommand_cxx_iface> esc_raw{canard_iface};
+    Canard::Publisher<uavcan_equipment_indication_LightsCommand_cxx_iface> rgb_led{canard_iface};
+    Canard::Publisher<uavcan_equipment_indication_BeepCommand_cxx_iface> buzzer{canard_iface};
+    Canard::Publisher<ardupilot_indication_SafetyState_cxx_iface> safety_state{canard_iface};
+    Canard::Publisher<uavcan_equipment_safety_ArmingStatus_cxx_iface> arming_status{canard_iface};
+    Canard::Publisher<uavcan_equipment_gnss_RTCMStream_cxx_iface> rtcm_stream{canard_iface};
+    Canard::Publisher<ardupilot_indication_NotifyState_cxx_iface> notify_state{canard_iface};
 
     // incoming messages
-    CubeFramework::ObjCallback<AP_UAVCAN, ardupilot_indication_Button> safety_button_cb{this, &AP_UAVCAN::handle_button};
-    CubeFramework::Subscriber<ardupilot_indication_Button_cxx_iface> safety_button_listener{safety_button_cb, _driver_index};
+    Canard::ObjCallback<AP_UAVCAN, ardupilot_indication_Button> safety_button_cb{this, &AP_UAVCAN::handle_button};
+    Canard::Subscriber<ardupilot_indication_Button_cxx_iface> safety_button_listener{safety_button_cb, _driver_index};
 
-    CubeFramework::ObjCallback<AP_UAVCAN, ardupilot_equipment_trafficmonitor_TrafficReport> traffic_report_cb{this, &AP_UAVCAN::handle_traffic_report};
-    CubeFramework::Subscriber<ardupilot_equipment_trafficmonitor_TrafficReport_cxx_iface> traffic_report_listener{traffic_report_cb, _driver_index};
+    Canard::ObjCallback<AP_UAVCAN, ardupilot_equipment_trafficmonitor_TrafficReport> traffic_report_cb{this, &AP_UAVCAN::handle_traffic_report};
+    Canard::Subscriber<ardupilot_equipment_trafficmonitor_TrafficReport_cxx_iface> traffic_report_listener{traffic_report_cb, _driver_index};
 
-    CubeFramework::ObjCallback<AP_UAVCAN, uavcan_equipment_actuator_Status> actuator_status_cb{this, &AP_UAVCAN::handle_actuator_status};
-    CubeFramework::Subscriber<uavcan_equipment_actuator_Status_cxx_iface> actuator_status_listener{actuator_status_cb, _driver_index};
+    Canard::ObjCallback<AP_UAVCAN, uavcan_equipment_actuator_Status> actuator_status_cb{this, &AP_UAVCAN::handle_actuator_status};
+    Canard::Subscriber<uavcan_equipment_actuator_Status_cxx_iface> actuator_status_listener{actuator_status_cb, _driver_index};
 
-    CubeFramework::ObjCallback<AP_UAVCAN, uavcan_equipment_esc_Status> esc_status_cb{this, &AP_UAVCAN::handle_ESC_status};
-    CubeFramework::Subscriber<uavcan_equipment_esc_Status_cxx_iface> esc_status_listener{esc_status_cb, _driver_index};
+    Canard::ObjCallback<AP_UAVCAN, uavcan_equipment_esc_Status> esc_status_cb{this, &AP_UAVCAN::handle_ESC_status};
+    Canard::Subscriber<uavcan_equipment_esc_Status_cxx_iface> esc_status_listener{esc_status_cb, _driver_index};
 
-    CubeFramework::ObjCallback<AP_UAVCAN, uavcan_protocol_debug_LogMessage> debug_cb{this, &AP_UAVCAN::handle_debug};
-    CubeFramework::Subscriber<uavcan_protocol_debug_LogMessage_cxx_iface> debug_listener{debug_cb, _driver_index};
+    Canard::ObjCallback<AP_UAVCAN, uavcan_protocol_debug_LogMessage> debug_cb{this, &AP_UAVCAN::handle_debug};
+    Canard::Subscriber<uavcan_protocol_debug_LogMessage_cxx_iface> debug_listener{debug_cb, _driver_index};
 
     // param client
-    CubeFramework::ObjCallback<AP_UAVCAN, uavcan_protocol_param_GetSetResponse> param_get_set_res_cb{this, &AP_UAVCAN::handle_param_get_set_response};
-    CubeFramework::Client<uavcan_protocol_param_GetSet_cxx_iface> param_get_set_client{canard_iface, param_get_set_res_cb};
+    Canard::ObjCallback<AP_UAVCAN, uavcan_protocol_param_GetSetResponse> param_get_set_res_cb{this, &AP_UAVCAN::handle_param_get_set_response};
+    Canard::Client<uavcan_protocol_param_GetSet_cxx_iface> param_get_set_client{canard_iface, param_get_set_res_cb};
 
-    CubeFramework::ObjCallback<AP_UAVCAN, uavcan_protocol_param_ExecuteOpcodeResponse> param_save_res_cb{this, &AP_UAVCAN::handle_param_save_response};
-    CubeFramework::Client<uavcan_protocol_param_ExecuteOpcode_cxx_iface> param_save_client{canard_iface, param_save_res_cb};
+    Canard::ObjCallback<AP_UAVCAN, uavcan_protocol_param_ExecuteOpcodeResponse> param_save_res_cb{this, &AP_UAVCAN::handle_param_save_response};
+    Canard::Client<uavcan_protocol_param_ExecuteOpcode_cxx_iface> param_save_client{canard_iface, param_save_res_cb};
 
     uavcan_protocol_param_ExecuteOpcodeRequest param_save_req;
     uavcan_protocol_param_GetSetRequest param_getset_req;
 
     // Node Info Server
-    CubeFramework::ObjCallback<AP_UAVCAN, uavcan_protocol_GetNodeInfoRequest> node_info_req_cb{this, &AP_UAVCAN::handle_node_info_request};
-    CubeFramework::Server<uavcan_protocol_GetNodeInfo_cxx_iface> node_info_server{canard_iface, node_info_req_cb};
+    Canard::ObjCallback<AP_UAVCAN, uavcan_protocol_GetNodeInfoRequest> node_info_req_cb{this, &AP_UAVCAN::handle_node_info_request};
+    Canard::Server<uavcan_protocol_GetNodeInfo_cxx_iface> node_info_server{canard_iface, node_info_req_cb};
     uavcan_protocol_GetNodeInfoResponse node_info_rsp;
 
     // incoming button handling

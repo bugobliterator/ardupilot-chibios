@@ -6,10 +6,10 @@
 #include <AP_Common/Bitmask.h>
 #include <StorageManager/StorageManager.h>
 #include <AP_CANManager/AP_CANManager.h>
-#include <cubeframework/publisher.h>
-#include <cubeframework/subscriber.h>
-#include <cubeframework/service_client.h>
-#include "AP_CubeFramework_iface.h"
+#include <canard/publisher.h>
+#include <canard/subscriber.h>
+#include <canard/service_client.h>
+#include "AP_Canard_iface.h"
 #include <dronecan_msgs.h>
 
 class AP_UAVCAN;
@@ -92,16 +92,16 @@ class AP_UAVCAN_DNA_Server
     AP_UAVCAN &_AP_UAVCAN;
     CanardInterface &_canard_iface;
 
-    CubeFramework::Publisher<uavcan_protocol_dynamic_node_id_Allocation_cxx_iface> allocation_pub{_canard_iface};
+    Canard::Publisher<uavcan_protocol_dynamic_node_id_Allocation_cxx_iface> allocation_pub{_canard_iface};
 
-    CubeFramework::ObjCallback<AP_UAVCAN_DNA_Server, uavcan_protocol_dynamic_node_id_Allocation> allocation_cb{this, &AP_UAVCAN_DNA_Server::handleAllocation};
-    CubeFramework::Subscriber<uavcan_protocol_dynamic_node_id_Allocation_cxx_iface> allocation_sub;
+    Canard::ObjCallback<AP_UAVCAN_DNA_Server, uavcan_protocol_dynamic_node_id_Allocation> allocation_cb{this, &AP_UAVCAN_DNA_Server::handleAllocation};
+    Canard::Subscriber<uavcan_protocol_dynamic_node_id_Allocation_cxx_iface> allocation_sub;
 
-    CubeFramework::ObjCallback<AP_UAVCAN_DNA_Server, uavcan_protocol_NodeStatus> node_status_cb{this, &AP_UAVCAN_DNA_Server::handleNodeStatus};
-    CubeFramework::Subscriber<uavcan_protocol_NodeStatus_cxx_iface> node_status_sub;
+    Canard::ObjCallback<AP_UAVCAN_DNA_Server, uavcan_protocol_NodeStatus> node_status_cb{this, &AP_UAVCAN_DNA_Server::handleNodeStatus};
+    Canard::Subscriber<uavcan_protocol_NodeStatus_cxx_iface> node_status_sub;
 
-    CubeFramework::ObjCallback<AP_UAVCAN_DNA_Server, uavcan_protocol_GetNodeInfoResponse> node_info_cb{this, &AP_UAVCAN_DNA_Server::handleNodeInfo};
-    CubeFramework::Client<uavcan_protocol_GetNodeInfo_cxx_iface> node_info_client;
+    Canard::ObjCallback<AP_UAVCAN_DNA_Server, uavcan_protocol_GetNodeInfoResponse> node_info_cb{this, &AP_UAVCAN_DNA_Server::handleNodeInfo};
+    Canard::Client<uavcan_protocol_GetNodeInfo_cxx_iface> node_info_client;
 
 public:
     AP_UAVCAN_DNA_Server(AP_UAVCAN &AP_UAVCAN);
